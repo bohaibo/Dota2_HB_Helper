@@ -29,7 +29,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Dota2改键同步',
+    name='Dota2CfgSync',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

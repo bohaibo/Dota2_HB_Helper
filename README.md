@@ -23,7 +23,7 @@
 
 ### 方式一：直接用打包好的 exe（无需装 Python）
 
-到 [Releases](../../releases) 下载 `Dota2改键同步.exe`，双击运行。
+到 [Releases](../../releases) 下载 `Dota2CfgSync.exe`，双击运行。
 
 > 首次运行 Windows 可能提示"未知发布者"，点"仍要运行"即可（未做代码签名）。
 

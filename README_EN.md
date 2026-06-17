@@ -34,7 +34,7 @@ English | [简体中文](./README.md)
 
 ### Option 1: Prebuilt exe (no Python needed)
 
-Download `Dota2改键同步.exe` from [Releases](../../releases) and double-click to run.
+Download `Dota2CfgSync.exe` from [Releases](../../releases) and double-click to run.
 
 > Windows may warn about an "unknown publisher" on first launch — click
 > "Run anyway" (the binary is unsigned).
