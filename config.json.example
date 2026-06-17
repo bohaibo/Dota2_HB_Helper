@@ -1,0 +1,7 @@
+{
+  "steam_api_key": "在这里填你的 Steam Web API key",
+  "show_avatar": true,
+  "proxy_enabled": false,
+  "proxy_host": "127.0.0.1",
+  "proxy_port": "7897"
+}

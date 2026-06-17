@@ -1,0 +1,27 @@
+# 隐私 / 运行时生成 (绝勿提交)
+config.json
+avatar_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 本地缓存 / 系统
+.codegraph
+.reasonix
+Thumbs.db
+desktop.ini
+.DS_Store
