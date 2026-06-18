@@ -1,5 +1,11 @@
 # Dota2 改键配置同步工具
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Release](https://img.shields.io/github/v/release/bohaibo/Dota2_HB_Helper?include_prereleases)](https://github.com/bohaibo/Dota2_HB_Helper/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/bohaibo/Dota2_HB_Helper/build.yml?branch=master&label=build)](https://github.com/bohaibo/Dota2_HB_Helper/actions/workflows/build.yml)
+[![Downloads](https://img.shields.io/github/downloads/bohaibo/Dota2_HB_Helper/total.svg)](https://github.com/bohaibo/Dota2_HB_Helper/releases)
+
 > 一键把某个 Steam 账号的 Dota2 改键配置复制到其他账号，附带账号头像识别。
 > 支持 Steam Web API 拉取昵称/头像、HTTP 代理、自动备份。
 
@@ -12,9 +18,9 @@
 - **账号自动识别**：扫描 `Steam\userdata` 下所有数字目录，通过 `loginusers.vdf`（SteamID64）和 `localconfig.vdf` 反查昵称，告别"哪个文件夹是哪个号"。
 - **改键一键同步**：把源账号的 `570\remote\cfg`（`dotakeys_personal.lst`、`config.cfg` 等）复制到目标账号，支持一次同步到多个号。
 - **自动备份（最多 2 份）**：覆盖前把目标原文件改名为 `.bak1` / `.bak2`，连续操作也只保留最近 2 份历史，不会堆积。
-- **头像加载（可选）**：填入 Steam Web API key 后，自动拉取各账号头像并显示在列表左侧；昵称也会用线上数据补全本地缺失。
+- **头像加载（可选）**：填入 Steam Web API key 后，自动拉取各账号头像并显示在列表左侧；昵称也会用线上数据补全本地缺失。头像优先从本地缓存读取，命中缓存时无需联网。
 - **HTTP 代理**：内置代理设置（默认 `127.0.0.1:7897`），解决国内直连 Steam API 失败（`WinError 10061`）的问题。
-- **离线可用**：不联网也能完成核心的改键同步；头像功能为可选项。
+- **离线可用**：不联网也能完成核心的改键同步；头像有缓存时亦可离线显示。
 - **单文件 / 免依赖核心**：仅依赖 Python 标准库（头像功能需 Pillow）。
 
 ---

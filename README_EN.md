@@ -1,5 +1,11 @@
 # Dota2 Keybind Config Sync Tool
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Release](https://img.shields.io/github/v/release/bohaibo/Dota2_HB_Helper?include_prereleases)](https://github.com/bohaibo/Dota2_HB_Helper/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/bohaibo/Dota2_HB_Helper/build.yml?branch=master&label=build)](https://github.com/bohaibo/Dota2_HB_Helper/actions/workflows/build.yml)
+[![Downloads](https://img.shields.io/github/downloads/bohaibo/Dota2_HB_Helper/total.svg)](https://github.com/bohaibo/Dota2_HB_Helper/releases)
+
 > Copy one Steam account's Dota2 keybind config to other accounts with one click,
 > with avatar recognition. Supports Steam Web API for nicknames/avatars, HTTP
 > proxy, and automatic backup.
@@ -21,10 +27,12 @@ English | [简体中文](./README.md)
   copies — no pile-up.
 - **Avatar loading (optional)**: After entering a Steam Web API key, each account's
   avatar is fetched and shown on the left of the list; missing local nicknames are
-  filled from online data too.
+  filled from online data too. Avatars load from local cache first — no network
+  needed when cached.
 - **HTTP proxy**: Built-in proxy settings (default `127.0.0.1:7897`) to fix direct
   Steam API connection failures (`WinError 10061`) in regions where Steam is blocked.
-- **Offline-capable**: Core keybind sync works without internet; avatar is optional.
+- **Offline-capable**: Core keybind sync works without internet; avatars display
+  offline when cached.
 - **Single-file, dependency-light core**: Uses only the Python standard library
   (Pillow needed only for avatars).
 

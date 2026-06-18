@@ -1,0 +1,61 @@
+name: Build & Release
+
+# 触发条件:
+#   1. 推送 v* 开头的 tag (如 v1.0, v1.1.0) -> 打包 exe 并发布到 GitHub Release
+#   2. 手动触发 (workflow_dispatch) -> 仅打包, 产物上传为 artifact 供测试
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 发布 Release 需要
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow
+
+      - name: Build exe
+        run: pyinstaller "Dota2改键同步.spec" --noconfirm
+
+      - name: Rename exe to include tag
+        id: artifact
+        shell: bash
+        run: |
+          # tag 触发时文件名带版本号 (如 Dota2CfgSync-v1.0.exe), 方便区分; 手动触发用原名
+          if [ -n "${GITHUB_REF_NAME:-}" ] && [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            NAME="Dota2CfgSync-${GITHUB_REF_NAME}.exe"
+          else
+            NAME="Dota2CfgSync.exe"
+          fi
+          mv "dist/Dota2CfgSync.exe" "dist/${NAME}"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "Artifact: ${NAME}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: dist/${{ steps.artifact.outputs.name }}
+
+      - name: Create GitHub Release & upload exe
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ steps.artifact.outputs.name }}
+          generate_release_notes: true
