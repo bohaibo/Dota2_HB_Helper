@@ -19,6 +19,8 @@ import json
 import os
 import re
 import shutil
+import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
@@ -50,12 +52,34 @@ BAK_SUFFIXES = [".bak1", ".bak2"]
 # Dota2 cfg 目录相对 userdata\<id> 的路径
 CFG_REL = os.path.join(DOTA2_APP_ID, "remote", "cfg")
 
-# 脚本所在目录 (用于存 config.json / avatar_cache)
+# 源码运行写入项目目录；打包运行写入 exe 目录，避开临时解压目录。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = (os.path.dirname(os.path.abspath(sys.executable))
+            if getattr(sys, "frozen", False) else SCRIPT_DIR)
+CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
+AVATAR_CACHE_DIR = os.path.join(DATA_DIR, "avatar_cache")
 
-# 配置文件 + 头像缓存目录
-CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.json")
-AVATAR_CACHE_DIR = os.path.join(SCRIPT_DIR, "avatar_cache")
+
+def migrate_legacy_data():
+    """迁移旧用户目录的数据，不覆盖项目或 exe 旁已有的数据。"""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    legacy_dirs = [os.path.join(
+        os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".local", "share"),
+        "Dota2CfgSync",
+    )]
+    for directory in legacy_dirs:
+        old_config = os.path.join(directory, "config.json")
+        if not os.path.exists(CONFIG_PATH) and os.path.isfile(old_config):
+            shutil.copy2(old_config, CONFIG_PATH)
+        old_cache = os.path.join(directory, "avatar_cache")
+        if os.path.isdir(old_cache):
+            os.makedirs(AVATAR_CACHE_DIR, exist_ok=True)
+            for name in os.listdir(old_cache):
+                source = os.path.join(old_cache, name)
+                target = os.path.join(AVATAR_CACHE_DIR, name)
+                if os.path.isfile(source) and not os.path.exists(target):
+                    shutil.copy2(source, target)
+
 
 # Steam Web API
 STEAM_API_SUMMARY_URL = (
@@ -252,7 +276,7 @@ def load_accounts(userdata_dir):
 # --- Steam Web API / 头像 -------------------------------------------------
 
 def load_config():
-    """读取脚本同目录的 config.json。返回 dict。"""
+    """读取项目或 exe 同目录的 config.json。返回 dict。"""
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             cfg = json.load(f)
@@ -264,12 +288,18 @@ def load_config():
 
 
 def save_config(cfg):
-    """写 config.json (UTF-8, 缩进)。"""
+    """原子保存；写入失败交给界面报告，避免误报成功。"""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix="config-", suffix=".tmp", dir=DATA_DIR)
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, CONFIG_PATH)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
 
 
 def get_api_key():
@@ -491,6 +521,9 @@ def sync_cfg(src_cfg_dir, dst_cfg_dir, log=None):
 class App:
     def __init__(self, root):
         self.root = root
+        migrate_legacy_data()
+        settings = load_config()
+        self.default_source = settings.get("default_source_account", "")
         self.root.title("Dota2 改键配置同步")
         self.root.minsize(720, 600)
 
@@ -515,7 +548,7 @@ class App:
         self.proxy_port_var = tk.StringVar(value=proxy["port"])
 
         # 自动探测默认目录
-        det = detect_steam_userdata_dir()
+        det = settings.get("userdata_dir") or detect_steam_userdata_dir()
         if det:
             self.userdata_dir.set(det)
 
@@ -569,7 +602,7 @@ class App:
             api, text="申请key→", command=lambda: webbrowser.open(STEAM_API_KEY_URL)
         ).pack(side="left", padx=4)
         ttk.Checkbutton(
-            api, text="显示头像(需联网)", variable=self.show_avatar,
+            api, text="显示头像(优先本地缓存)", variable=self.show_avatar,
             command=self.on_toggle_avatar
         ).pack(side="left", padx=(16, 4))
         ttk.Button(api, text="清除头像缓存", command=self.clear_cache).pack(
@@ -629,6 +662,9 @@ class App:
             bot, textvariable=self.src_var, state="readonly", width=40
         )
         self.src_combo.grid(row=0, column=1, sticky="w", pady=(8, 2))
+        ttk.Button(bot, text="设为默认源账号", command=self.save_default_source).grid(
+            row=0, column=2, padx=8, pady=(8, 2)
+        )
 
         ttk.Label(bot, text="目标账号 (被覆盖):").grid(
             row=1, column=0, sticky="nw", padx=8, pady=2
@@ -677,6 +713,9 @@ class App:
             actions, text="开始同步", command=self.do_sync
         )
         self.sync_btn.pack(side="left")
+        ttk.Button(actions, text="同步到所有其他账号", command=self.sync_all).pack(
+            side="left", padx=8
+        )
         ttk.Button(actions, text="退出", command=self.root.quit).pack(
             side="right", padx=8
         )
@@ -714,6 +753,11 @@ class App:
 
     def refresh_accounts(self):
         ud = self.userdata_dir.get().strip()
+        previous_source = self._get_selected_source()
+        self.accounts = []
+        self.src_combo["values"] = ()
+        self.dst_combo["values"] = ()
+        self._item_by_acct = {}
         # 清空旧列表
         for i in self.tree.get_children():
             self.tree.delete(i)
@@ -729,6 +773,9 @@ class App:
             self.log(f"目录不存在: {ud}")
             return
 
+        cfg = load_config()
+        cfg["userdata_dir"] = ud
+        save_config(cfg)
         self.accounts = load_accounts(ud)
         if not self.accounts:
             self.log(f"未在 {ud} 下找到任何账号目录")
@@ -745,6 +792,9 @@ class App:
 
         self.src_combo["values"] = labels
         self.dst_combo["values"] = labels
+        source = previous_source or self.default_source
+        if any(a.account_id == source for a in self.accounts):
+            self.src_var.set(self._label_for(source))
 
         # 多选列表: 用复选框风格 (文字前加 ☐/☑)
         for a in self.accounts:
@@ -881,10 +931,16 @@ class App:
                     self.tree.item(item, values=(str(a),))
                 updated += 1
         if updated:
-            # 同步刷新下拉框标签
+            # 昵称变化时按账号 ID 保留当前选择。
+            source = self._get_selected_source()
+            target = self._account_from_label(self.dst_var.get())
             labels = [f"{a.display_name} ({a.account_id})" for a in self.accounts]
             self.src_combo["values"] = labels
             self.dst_combo["values"] = labels
+            if source:
+                self.src_var.set(self._label_for(source))
+            if target:
+                self.dst_var.set(self._label_for(target))
             self.log(f"已用 API 昵称补全 {updated} 个账号")
 
     def _render_avatars(self, path_map):
@@ -910,8 +966,8 @@ class App:
 
     def save_api_key(self):
         key = self.api_key_var.get().strip()
-        self.api_key = key
         set_api_key(key)
+        self.api_key = key
         self.log("API key 已保存")
         if key:
             self.refresh_accounts()  # 重新加载 (会触发头像)
@@ -945,6 +1001,20 @@ class App:
             f"http://{host}:{port}"
         )
 
+
+    def save_default_source(self):
+        source = self._get_selected_source()
+        if not source:
+            messagebox.showerror("错误", "请先选择源账号。")
+            return
+        cfg = load_config()
+        cfg["default_source_account"] = source
+        save_config(cfg)
+        self.default_source = source
+        self.log(f"默认源账号已保存: {self._label_for(source)}")
+
+    def sync_all(self):
+        self.do_sync(all_accounts=True)
 
     def _label_for(self, account_id):
         for a in self.accounts:
@@ -1007,16 +1077,17 @@ class App:
 
     # ---------- 预览 / 同步 ----------
 
-    def _validate(self):
+    def _validate(self, all_accounts=False):
         ud = self.userdata_dir.get().strip()
         if not ud or not os.path.isdir(ud):
             messagebox.showerror("错误", "Steam userdata 目录无效。")
             return None
         src = self._get_selected_source()
-        if not src:
+        if not src or not any(a.account_id == src for a in self.accounts):
             messagebox.showerror("错误", "请选择源账号。")
             return None
-        tgts = self._get_selected_targets()
+        tgts = ([a.account_id for a in self.accounts if a.account_id != src]
+                if all_accounts else self._get_selected_targets())
         if not tgts:
             messagebox.showerror("错误", "请选择至少一个目标账号。")
             return None
@@ -1054,8 +1125,8 @@ class App:
             lines.append(f"  → {self._label_for(t)}\n")
         messagebox.showinfo("预览", "".join(lines))
 
-    def do_sync(self):
-        v = self._validate()
+    def do_sync(self, all_accounts=False):
+        v = self._validate(all_accounts=all_accounts)
         if not v:
             return
         src, tgts = v
@@ -1108,6 +1179,9 @@ def main():
         windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         pass
+    def report_error(exc_type, exc_value, traceback):
+        messagebox.showerror("操作失败", f"操作未完成：{exc_value}")
+    root.report_callback_exception = report_error
     App(root)
     root.mainloop()
 

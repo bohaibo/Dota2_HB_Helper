@@ -146,3 +146,9 @@ to sync keybinds.
 
 [MIT License](./LICENSE) — free to use, modify, and distribute, including commercial
 and closed-source use; just keep the copyright notice.
+
+## Persistent settings and default source
+
+Settings and avatar files are stored in the project directory when running from source, or beside the executable in packaged builds. Previous data in `%LOCALAPPDATA%\Dota2CfgSync` is migrated automatically without overwriting existing local data. The API key is stored as plain text locally.
+
+Select a source and click “设为默认源账号” to restore it on the next launch. Click “同步到所有其他账号” to copy the current source configuration to every other listed account, with confirmation and backups. Cached avatars work offline. The userdata path is remembered as well.
